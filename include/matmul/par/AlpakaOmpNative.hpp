@@ -137,8 +137,8 @@
         using Dim1 = alpaka::dim::DimInt<1u>;
         using Dim2 = alpaka::dim::DimInt<2u>;
 
-        using Vec1 = alpaka::Vec<Dim1, TSize>;
-        using Vec2 = alpaka::Vec<Dim2, TSize>;
+        using Vec1 = alpaka::vec::Vec<Dim1, TSize>;
+        using Vec2 = alpaka::vec::Vec<Dim2, TSize>;
 
 
         if(matmul_mat_gemm_early_out(m, n, k, alpha, beta))
@@ -148,7 +148,7 @@
 
         // Select a device to execute on.
         auto devAcc(
-            alpaka::dev::DevMan<TAcc>::getDevByIdx(0));
+            alpaka::pltf::getDevByIdx< alpaka::pltf::Pltf< alpaka::dev::Dev<TAcc> > >(0));
 
         // Get a stream on this device.
         Stream<alpaka::dev::Dev<TAcc>> stream(devAcc);
@@ -220,8 +220,8 @@
 
         using Dim1 = alpaka::dim::DimInt<1u>;
         using Dim2 = alpaka::dim::DimInt<2u>;
-        using Vec1 = alpaka::Vec<Dim1, TSize>;
-        using Vec2 = alpaka::Vec<Dim2, TSize>;
+        using Vec1 = alpaka::vec::Vec<Dim1, TSize>;
+        using Vec2 = alpaka::vec::Vec<Dim2, TSize>;
 
         if(matmul_mat_gemm_early_out(m, n, k, alpha, beta))
         {
@@ -229,11 +229,11 @@
         }
 
         // Get the host device.
-        auto devHost(alpaka::dev::DevManCpu::getDevByIdx(0u));
+        auto devHost(alpaka::pltf::getDevByIdx< alpaka::pltf::Pltf< alpaka::dev::DevCpu > >(0u));
 
         // Select a device to execute on.
         auto devAcc(
-            alpaka::dev::DevMan<TAcc>::getDevByIdx(0));
+            alpaka::pltf::getDevByIdx< alpaka::pltf::Pltf< alpaka::dev::Dev<TAcc> > >(0));
 
         // Get a stream on this device.
         Stream<alpaka::dev::Dev<TAcc>> stream(devAcc);
@@ -293,7 +293,7 @@
         auto bufCAcc(alpaka::mem::buf::alloc<TElem, TSize>(devAcc, v2uiExtentsC));
         alpaka::mem::view::copy(stream, bufCAcc, bufCHost, v2uiExtentsC);
 
-        alpaka::Vec<Dim1, TSize> const M(m);
+        alpaka::vec::Vec<Dim1, TSize> const M(m);
         // Let alpaka calculate good block and grid sizes given our full problem extents.
         alpaka::workdiv::WorkDivMembers<Dim1, TSize> const workDiv(
             alpaka::workdiv::getValidWorkDiv<TAcc>(

@@ -150,21 +150,21 @@
                     //-----------------------------------------------------------------------------
                     //! \return The size of the shared memory allocated for a block.
                     //-----------------------------------------------------------------------------
-                    template<
-                        typename TElem>
+                    template<typename TVec>
                     ALPAKA_FN_HOST static auto getBlockSharedMemDynSizeBytes(
-                        alpaka::Vec<alpaka::dim::Dim<TAcc>, size::Size<TAcc>> const & blockThreadExtent,
-                        alpaka::Vec<alpaka::dim::Dim<TAcc>, size::Size<TAcc>> const & threadElemExtent,
+                        GemmAlpakaSharedKernel const & gemmAlpakaSharedKernel,
+                        TVec const & blockThreadExtent,
+                        TVec const & threadElemExtent,
                         TSize const & m,
                         TSize const & n,
                         TSize const & k,
                         TElem const & alpha,
-                        TElem const * const A,
+                        TElem const * const MATMUL_RESTRICT A,
                         TSize const & lda,
-                        TElem const * const B,
+                        TElem const * const MATMUL_RESTRICT B,
                         TSize const & ldb,
                         TElem const & beta,
-                        TElem * const C,
+                        TElem * const MATMUL_RESTRICT C,
                         TSize const & ldc)
                     -> size::Size<TAcc>
                     {
@@ -254,7 +254,7 @@
         TElem * const MATMUL_RESTRICT C, TSize const ldc)
     {
         using Dim2 = alpaka::dim::DimInt<2u>;
-        using Vec2 = alpaka::Vec<Dim2, TSize>;
+        using Vec2 = alpaka::vec::Vec<Dim2, TSize>;
 
         if(matmul_mat_gemm_early_out(m, n, k, alpha, beta))
         {
@@ -263,7 +263,7 @@
 
         // Select a device to execute on.
         auto devAcc(
-            alpaka::dev::DevMan<TAcc>::getDevByIdx(0));
+            alpaka::pltf::getDevByIdx< alpaka::pltf::Pltf< alpaka::dev::Dev<TAcc> > >(0));
 
         // Get a stream on this device.
         Stream<alpaka::dev::Dev<TAcc>> stream(devAcc);
@@ -333,7 +333,7 @@
         TElem * const MATMUL_RESTRICT C, TSize const ldc)
     {
         using Dim2 = alpaka::dim::DimInt<2u>;
-        using Vec2 = alpaka::Vec<Dim2, TSize>;
+        using Vec2 = alpaka::vec::Vec<Dim2, TSize>;
 
         if(matmul_mat_gemm_early_out(m, n, k, alpha, beta))
         {
@@ -341,11 +341,11 @@
         }
 
         // Get the host device.
-        auto devHost(alpaka::dev::DevManCpu::getDevByIdx(0u));
+        auto devHost(alpaka::pltf::getDevByIdx< alpaka::pltf::Pltf< alpaka::dev::DevCpu > >(0u));
 
         // Select a device to execute on.
         auto devAcc(
-            alpaka::dev::DevMan<TAcc>::getDevByIdx(0));
+            alpaka::pltf::getDevByIdx< alpaka::pltf::Pltf< alpaka::dev::Dev<TAcc> > >(0));
 
         // Get a stream on this device.
         Stream<alpaka::dev::Dev<TAcc>> stream(devAcc);
