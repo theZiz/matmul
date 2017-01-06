@@ -159,7 +159,7 @@
             MatC matC) const
         -> void
         {
-            using Dim2 = alpaka::dim::DimInt<2u>;
+            /*using Dim2 = alpaka::dim::DimInt<2u>;
             using Vec2 = alpaka::vec::Vec<Dim2, TSize>;
 
             using VecSize = typename OptimalVectorSize<TAcc>::type;
@@ -324,7 +324,7 @@
                         matC[ offsetC ] = alpha * matDot[ Vec2( i, j ) ] + beta * matC[ offsetC ];
 
                 }
-            }
+            }*/
 
         }
     };
@@ -477,13 +477,22 @@
         );
 
         // Let alpaka calculate good block and grid sizes given our full problem extents.
-        alpaka::workdiv::WorkDivMembers<Dim2, TSize> const workDiv(
+        alpaka::workdiv::WorkDivMembers<Dim2, TSize> workDiv(
             alpaka::workdiv::getValidWorkDiv<TAcc>(
                 devAcc,
                 v2uiExtentsC,
                 elemExtent,
                 false,
                 alpaka::workdiv::GridBlockExtentSubDivRestrictions::EqualExtent));
+
+        // We need to check, whether this workdiv is too big for the shared memory
+        while ( 2u * workDiv.m_blockThreadExtent.prod() * workDiv.m_threadElemExtent.prod() * sizeof(TElem) >= 65536) // 64KB
+        {
+            workDiv.m_gridBlockExtent[0] *= 2;
+            workDiv.m_gridBlockExtent[1] *= 2;
+            workDiv.m_blockThreadExtent[0] /= 2;
+            workDiv.m_blockThreadExtent[1] /= 2;
+        }
 
         // Create an instance of the kernel functor.
         TKernelFnObj kernel;
