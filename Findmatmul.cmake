@@ -25,7 +25,7 @@
 # Set the following CMake variables BEFORE calling FIND_PACKAGE to
 # change the behavior of this module:
 # - ``MATMUL_ELEMENT_TYPE_DOUBLE`` {ON, OFF}
-# - ``MATMUL_INDEX_TYPE`` {int, size_t, ...}
+# - ``MATMUL_INDEX_TYPE`` {size_t, int, ...}
 # - ``MATMUL_ALIGNED_MALLOC`` {ON, OFF}
 # - ``MATMUL_RETURN_COMPUTATION_TIME`` {ON, OFF}
 #
