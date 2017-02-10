@@ -129,7 +129,7 @@ template<
     typename T_IndexType,
     typename T_Access = alpakaHelper2::IdentityAccess< typename T_PtrStorage::Value >
 >
-struct Matrix : protected T_PtrStorage
+struct Matrix : T_PtrStorage
 {
     using PtrStorage = T_PtrStorage;
     using IndexType = T_IndexType;
@@ -208,7 +208,7 @@ struct MathVec
     static constexpr auto dim = T_Dim::value;
 
     // data storage
-    T m_ptr[ dim ][ dim ];
+    /*__declspec(align(64))*/ T m_ptr[ dim ][ dim ];
 
     ALPAKA_FN_ACC
     MathVec( )

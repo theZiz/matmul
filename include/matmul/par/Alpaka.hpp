@@ -285,6 +285,11 @@
                 false,
                 alpaka::workdiv::GridBlockExtentSubDivRestrictions::EqualExtent));
 
+        printf("\n");
+        printf("%i:%i:%i x %i:%i:%i -> ",
+            workDiv.m_gridBlockExtent[0],workDiv.m_blockThreadExtent[0],workDiv.m_threadElemExtent[0],
+            workDiv.m_gridBlockExtent[1],workDiv.m_blockThreadExtent[1],workDiv.m_threadElemExtent[1]);
+
         // Create an instance of the kernel functor.
         TKernelFnObj kernel;
 

@@ -55,6 +55,15 @@
     };
 #endif
 
+#ifndef OMP_ELEM_NUM
+    #define OMP_ELEM_NUM 256u
+#endif
+#define VECTOR_PRAGMA \
+    /*_Pragma ("vector aligned")*/ \
+    _Pragma ("ivdep")
+
+
+
 #ifdef ALPAKA_ACC_CPU_B_SEQ_T_OMP2_ENABLED
     template<
         typename... T_Args
@@ -65,7 +74,7 @@
         >
     >
     {
-        using type = alpaka::dim::DimInt<128u>;
+        using type = alpaka::dim::DimInt<OMP_ELEM_NUM>;
     };
 #endif
 
@@ -79,7 +88,7 @@
         >
     >
     {
-        using type = alpaka::dim::DimInt<128u>;
+        using type = alpaka::dim::DimInt<OMP_ELEM_NUM>;
     };
 #endif
 
@@ -93,7 +102,7 @@
         >
     >
     {
-        using type = alpaka::dim::DimInt<128u>;
+        using type = alpaka::dim::DimInt<OMP_ELEM_NUM>;
     };
 #endif
 
@@ -128,9 +137,13 @@
                 for( TSize k(0); k < numElements; ++k )
                 {
                     auto const a = matA[Vec2(i,k)];
+                    auto lineC = matC.m_ptr[i];
+                    auto lineB = &(matB.m_ptr[k*numElements]);
+                    VECTOR_PRAGMA
                     for( TSize j(0); j < numElements; ++j )
                     {
-                            matC[Vec2(i,j)] += a * matB[Vec2(k,j)];
+                            //matC[Vec2(i,j)] += a * matB[Vec2(k,j)];
+                            lineC[j] += a * lineB[j];
                     }
                 }
         }
@@ -153,13 +166,13 @@
             TAcc const & acc,
             TSize const & m, TSize const & n, TSize const & k,
             TElem const & alpha,
-            MatA const & matA,
-            MatB const & matB,
+            MatA const & MATMUL_RESTRICT matA,
+            MatB const & MATMUL_RESTRICT matB,
             TElem const & beta,
-            MatC matC) const
+            MatC MATMUL_RESTRICT matC) const
         -> void
         {
-            /*using Dim2 = alpaka::dim::DimInt<2u>;
+            using Dim2 = alpaka::dim::DimInt<2u>;
             using Vec2 = alpaka::vec::Vec<Dim2, TSize>;
 
             using VecSize = typename OptimalVectorSize<TAcc>::type;
@@ -203,6 +216,7 @@
             MVecNN matDot;
             for(TSize j(0); j < static_cast<TSize>(VecSize::value); ++j)
             {
+                VECTOR_PRAGMA
                 for(TSize i(0); i < static_cast<TSize>(VecSize::value); ++i)
                 {
                     matDot[ Vec2(j,i) ] = 0;
@@ -248,21 +262,28 @@
                 //load shared A
                 for( TSize i(0); i < numWorkElemsPerDim; ++i )
                 {
+                    auto offsetInTile_X = currentThreadInA_y + i;
+                    auto lineSharedA = &(sharedMatA.m_ptr[offsetInTile_X * sharedMatA.m_extent[1]]);
+                    auto lineSharedB = &(sharedMatB.m_ptr[offsetInTile_X * sharedMatB.m_extent[1]]);
+                    auto lineMatA = &(matA.m_ptr[(offsetInTile_X + offsetInA_y) * matA.m_extent[1]]);
+                    auto lineMatB = &(matB.m_ptr[(offsetInTile_X + offsetA_x) * matB.m_extent[1]]);
+                    VECTOR_PRAGMA
                     for( TSize j(0); j < numWorkElemsPerDim; ++j )
                     {
                         Vec2 const offsetInTile(
-                            currentThreadInA_y + i,
+                            offsetInTile_X,
                             currentThreadInB_x + j
                         );
                         Vec2 const globalIdxA(offsetInTile + globalBlockOffsetInA);
                         Vec2 const globalIdxB(offsetInTile + globalBlockOffsetInB);
 
                         auto const isValidA = (globalIdxA[0]<matA.m_extent[0]) && (globalIdxA[1]<k);
-
                         auto const isValidB = (globalIdxB[0]<matB.m_extent[0]) && (globalIdxB[1]<n);
 
-                        sharedMatA[ offsetInTile ] = isValidA ? matA[ globalIdxA ] : static_cast<TElem>(0);
-                        sharedMatB[ offsetInTile ] = isValidB ? matB[ globalIdxB ] : static_cast<TElem>(0);
+                        //sharedMatA[ offsetInTile ] = isValidA ? matA[ globalIdxA ] : static_cast<TElem>(0);
+                        //sharedMatB[ offsetInTile ] = isValidB ? matB[ globalIdxB ] : static_cast<TElem>(0);
+                        lineSharedA[offsetInTile[1]] = isValidA ? lineMatA[ globalIdxA[1] ] : static_cast<TElem>(0);
+                        lineSharedB[offsetInTile[1]] = isValidB ? lineMatB[ globalIdxB[1] ] : static_cast<TElem>(0);
 
                     }
                 }
@@ -312,6 +333,7 @@
 
             for(TSize i(0); i < numWorkElemsPerDim; ++i)
             {
+                VECTOR_PRAGMA
                 for(TSize j(0); j < numWorkElemsPerDim; ++j)
                 {
                     Vec2 const offsetC(
@@ -324,7 +346,7 @@
                         matC[ offsetC ] = alpha * matDot[ Vec2( i, j ) ] + beta * matC[ offsetC ];
 
                 }
-            }*/
+            }
 
         }
     };
@@ -361,10 +383,10 @@
                         TSize const & n,
                         TSize const & k,
                         TElem const & alpha,
-                        MatA const & matA,
-                        MatB const & matB,
+                        MatA const & MATMUL_RESTRICT matA,
+                        MatB const & MATMUL_RESTRICT matB,
                         TElem const & beta,
-                        MatC matC)
+                        MatC MATMUL_RESTRICT matC)
                     -> size::Size<TAcc>
                     {
                         static_assert(
@@ -485,6 +507,7 @@
                 false,
                 alpaka::workdiv::GridBlockExtentSubDivRestrictions::EqualExtent));
 
+#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
         // We need to check, whether this workdiv is too big for the shared memory
         while ( 2u * workDiv.m_blockThreadExtent.prod() * workDiv.m_threadElemExtent.prod() * sizeof(TElem) >= 65536) // 64KB
         {
@@ -493,6 +516,7 @@
             workDiv.m_blockThreadExtent[0] /= 2;
             workDiv.m_blockThreadExtent[1] /= 2;
         }
+#endif
 
         // Create an instance of the kernel functor.
         TKernelFnObj kernel;
@@ -542,7 +566,6 @@
             matB,
             beta,
             matC));
-
         MATMUL_TIME_START;
 
         // Execute the kernel.
@@ -635,10 +658,19 @@
         // TODO: Test if interleaved is better then alloc first, copy later.
         // Because alloc causes a device sync this may hinder the copies.
         auto bufAAcc(alpaka::mem::buf::alloc<TElem, TSize>(devAcc, v2uiExtentsA));
+        //#pragma omp for nowait schedule(guided)
+        //for (size_t i = 0; i < v2uiExtentsA; i++)
+        //    alpaka::mem::view::getPtrNative(bufAAcc)[i] = 0;
         alpaka::mem::view::copy(stream, bufAAcc, bufAHost, v2uiExtentsA);
         auto bufBAcc(alpaka::mem::buf::alloc<TElem, TSize>(devAcc, v2uiExtentsB));
+        //#pragma omp for nowait schedule(guided)
+        //for (size_t i = 0; i < v2uiExtentsB; i++)
+        //    alpaka::mem::view::getPtrNative(bufBAcc)[i] = 0;
         alpaka::mem::view::copy(stream, bufBAcc, bufBHost, v2uiExtentsB);
         auto bufCAcc(alpaka::mem::buf::alloc<TElem, TSize>(devAcc, v2uiExtentsC));
+        //#pragma omp for nowait schedule(guided)
+        //for (size_t i = 0; i < v2uiExtentsC; i++)
+        //    alpaka::mem::view::getPtrNative(bufCAcc)[i] = 0;
         alpaka::mem::view::copy(stream, bufCAcc, bufCHost, v2uiExtentsC);
 
         // Let alpaka calculate good block and grid sizes given our full problem extents.
