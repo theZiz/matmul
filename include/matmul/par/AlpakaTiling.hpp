@@ -58,8 +58,18 @@
 #ifndef OMP_ELEM_NUM
     #define OMP_ELEM_NUM 256u
 #endif
+
+#ifndef OMP_DIVISOR
+    #define OMP_DIVISOR 1u
+#endif
+
+#ifndef REAL_SHARED_MEMORY
+    #define REAL_SHARED_MEMORY 1
+#endif
+
 #define VECTOR_PRAGMA \
     /*_Pragma ("vector aligned")*/ \
+    /*_Pragma ("unroll (8)")*/ \
     _Pragma ("ivdep")
 
 
@@ -131,14 +141,18 @@
         ) const
         {
             using Vec2 = typename MatA::IndexType;
-
             constexpr auto numElements = T_Size::value;
+            VECTOR_PRAGMA
             for( TSize i(0); i < numElements; ++i )
+            {
+                auto lineC = &(matC[Vec2(i,0)]);
+                VECTOR_PRAGMA
                 for( TSize k(0); k < numElements; ++k )
                 {
                     auto const a = matA[Vec2(i,k)];
-                    auto lineC = matC.m_ptr[i];
-                    auto lineB = &(matB.m_ptr[k*numElements]);
+                    auto lineB = &(matB[Vec2(k,0)]);
+                    __assume_aligned(lineC,64);// <- notwendig?
+                    __assume_aligned(lineB,64);
                     VECTOR_PRAGMA
                     for( TSize j(0); j < numElements; ++j )
                     {
@@ -146,6 +160,7 @@
                             lineC[j] += a * lineB[j];
                     }
                 }
+            }
         }
     };
 
@@ -181,6 +196,10 @@
                 alpakaHelper2::ConstPtrValue<TElem>,
                 Vec2
             >;
+            using ConstMatrix = alpakaHelper::Matrix<
+                alpakaHelper2::ConstPtrConstValue<TElem>,
+                Vec2
+            >;
 
             auto const numBlocks(alpaka::workdiv::getWorkDiv<alpaka::Grid, alpaka::Blocks>(acc));
             auto const numThreads(alpaka::workdiv::getWorkDiv<alpaka::Block, alpaka::Threads>(acc));
@@ -198,15 +217,16 @@
             //Shared alpakaHelperory used to store the current blocks of A and B.
             TElem * const sharedBasePointer(alpaka::block::shared::dyn::getMem<TElem>(acc));
             TElem * const sharedBasePointerB(sharedBasePointer + workSize[0] * workSize[1]);
+#ifdef REAL_SHARED_MEMORY
             Matrix sharedMatA(
                 sharedBasePointer,
                 workSize
             );
-
             Matrix sharedMatB(
                 sharedBasePointerB,
                 workSize
             );
+#endif
 
             using MVecNN = alpakaHelper::MathVec<
                 TElem,
@@ -214,6 +234,7 @@
             >;
 
             MVecNN matDot;
+            VECTOR_PRAGMA
             for(TSize j(0); j < static_cast<TSize>(VecSize::value); ++j)
             {
                 VECTOR_PRAGMA
@@ -247,9 +268,9 @@
 
             );
 
+            VECTOR_PRAGMA
             for(TSize blockA_x = 0; blockA_x < nBlocks; ++blockA_x)
             {
-
                 TSize const offsetA_x = blockA_x * workSize[ 1 ];
                 Vec2 const globalBlockOffsetInA(
                     offsetInA_y,
@@ -259,7 +280,9 @@
                     offsetA_x,
                     offsetInB_x
                 );
-                //load shared A
+#ifdef REAL_SHARED_MEMORY
+                //load shared A & B
+                VECTOR_PRAGMA
                 for( TSize i(0); i < numWorkElemsPerDim; ++i )
                 {
                     auto offsetInTile_X = currentThreadInA_y + i;
@@ -287,50 +310,62 @@
 
                     }
                 }
-
-
                 alpaka::block::sync::syncBlockThreads(acc);
-
-
+#else
+                //create view of A & B
+                ConstMatrix sharedMatA(
+                    matA.view(globalBlockOffsetInA)
+                );
+                ConstMatrix sharedMatB(
+                    matB.view(globalBlockOffsetInB)
+                );
+#endif
                 // move over line in A workSize
+                VECTOR_PRAGMA
                 for(TSize k3(0); k3 < workSize[ 0 ]; k3 += numWorkElemsPerDim)
                 {
+                    using L1VecSize = alpaka::dim::DimInt<numWorkElemsPerDim/OMP_DIVISOR>;
+                    VECTOR_PRAGMA
+                    for (int li = 0; li < OMP_DIVISOR; ++li)
+                        VECTOR_PRAGMA
+                        for (int lj = 0; lj < OMP_DIVISOR; ++lj)
+                        {
+                            Vec2 const globalIdx_Dot(
+                                li * L1VecSize::value,
+                                lj * L1VecSize::value
+                            );
+                            Matrix tmpDot(
+                                matDot.view(globalIdx_Dot)
+                            );
 
-                    Vec2 const globalIdx_A(
-                        currentThreadInA_y,
-                        k3
-                    );
-                    Vec2 const globalIdx_B(
-                        k3,
-                        currentThreadInB_x
-                    );
+                            for (TSize k4(0); k4 < OMP_DIVISOR; ++k4 )
+                            {
+                                Vec2 const globalIdx_A(
+                                    currentThreadInA_y + li * L1VecSize::value,
+                                    k3 + k4 * L1VecSize::value
+                                );
+                                Vec2 const globalIdx_B(
+                                    k3 + k4 * L1VecSize::value,
+                                    currentThreadInB_x + lj * L1VecSize::value
+                                );
 
-                    Matrix const tmpA(
-                        sharedMatA.view(
-                            Vec2(
-                                globalIdx_A[ 0 ],
-                                globalIdx_A[ 1 ]
-                            )
-                        )
-                    );
-                    Matrix const tmpB(
-                        sharedMatB.view(
-                            Vec2(
-                                globalIdx_B[ 0 ],
-                                globalIdx_B[ 1 ]
-                            )
-                        )
-                    );
+                                decltype(sharedMatA) const tmpA(
+                                    sharedMatA.view(globalIdx_A)
+                                );
+                                decltype(sharedMatB) const tmpB(
+                                    sharedMatB.view(globalIdx_B)
+                                );
 
-                    ElementMatMul<VecSize> const elemMatMul;
+                                ElementMatMul<L1VecSize> const elemMatMul;
 
-                    elemMatMul(tmpA,tmpB,matDot);
-                }
-
+                                elemMatMul(tmpA,tmpB,tmpDot);
+                            }
+                        }
+                    }
                 alpaka::block::sync::syncBlockThreads(acc);
 
             }
-
+            VECTOR_PRAGMA
             for(TSize i(0); i < numWorkElemsPerDim; ++i)
             {
                 VECTOR_PRAGMA
@@ -403,7 +438,11 @@
                         boost::ignore_unused(matC);
 
                         // Reserve the buffer for the two blocks of A and B.
+#ifdef REAL_SHARED_MEMORY
                         return 2u * blockThreadExtent.prod() * threadElemExtent.prod() * sizeof(TElem);
+#else
+                        return 0;
+#endif
                     }
                 };
 
@@ -592,7 +631,7 @@
         TElem const beta,
         TElem * const MATMUL_RESTRICT C, TSize const ldc)
     {
-
+        std::cout << "Using explicit memcpy" << std::endl;
         using Dim2 = alpaka::dim::DimInt<2u>;
         using Vec2 = alpaka::vec::Vec<Dim2, TSize>;
 
@@ -658,19 +697,19 @@
         // TODO: Test if interleaved is better then alloc first, copy later.
         // Because alloc causes a device sync this may hinder the copies.
         auto bufAAcc(alpaka::mem::buf::alloc<TElem, TSize>(devAcc, v2uiExtentsA));
-        //#pragma omp for nowait schedule(guided)
-        //for (size_t i = 0; i < v2uiExtentsA; i++)
-        //    alpaka::mem::view::getPtrNative(bufAAcc)[i] = 0;
+        #pragma omp for schedule(guided)
+        for (size_t i = 0; i < v2uiExtentsA.prod(); i++)
+            alpaka::mem::view::getPtrNative(bufAAcc)[i] = 0;
         alpaka::mem::view::copy(stream, bufAAcc, bufAHost, v2uiExtentsA);
         auto bufBAcc(alpaka::mem::buf::alloc<TElem, TSize>(devAcc, v2uiExtentsB));
-        //#pragma omp for nowait schedule(guided)
-        //for (size_t i = 0; i < v2uiExtentsB; i++)
-        //    alpaka::mem::view::getPtrNative(bufBAcc)[i] = 0;
+        #pragma omp for schedule(guided)
+        for (size_t i = 0; i < v2uiExtentsB.prod(); i++)
+            alpaka::mem::view::getPtrNative(bufBAcc)[i] = 0;
         alpaka::mem::view::copy(stream, bufBAcc, bufBHost, v2uiExtentsB);
         auto bufCAcc(alpaka::mem::buf::alloc<TElem, TSize>(devAcc, v2uiExtentsC));
-        //#pragma omp for nowait schedule(guided)
-        //for (size_t i = 0; i < v2uiExtentsC; i++)
-        //    alpaka::mem::view::getPtrNative(bufCAcc)[i] = 0;
+        #pragma omp for schedule(guided)
+        for (size_t i = 0; i < v2uiExtentsC.prod(); i++)
+            alpaka::mem::view::getPtrNative(bufCAcc)[i] = 0;
         alpaka::mem::view::copy(stream, bufCAcc, bufCHost, v2uiExtentsC);
 
         // Let alpaka calculate good block and grid sizes given our full problem extents.
@@ -681,6 +720,17 @@
                 elemExtent,
                 false,
                 alpaka::workdiv::GridBlockExtentSubDivRestrictions::EqualExtent));
+
+#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
+        // We need to check, whether this workdiv is too big for the shared memory
+        while ( 2u * workDiv.m_blockThreadExtent.prod() * workDiv.m_threadElemExtent.prod() * sizeof(TElem) >= 65536) // 64KB
+        {
+            workDiv.m_gridBlockExtent[0] *= 2;
+            workDiv.m_gridBlockExtent[1] *= 2;
+            workDiv.m_blockThreadExtent[0] /= 2;
+            workDiv.m_blockThreadExtent[1] /= 2;
+        }
+#endif
 
         using Matrix = alpakaHelper::Matrix<
             alpakaHelper2::ConstPtrValue<TElem>,
@@ -731,12 +781,10 @@
             beta,
             matC));
 
-
 #ifdef MATMUL_RETURN_COMPUTATION_TIME
         alpaka::wait::wait(stream);
 #endif
         MATMUL_TIME_START;
-
         // Execute the kernel.
         alpaka::stream::enqueue(stream, exec);
 

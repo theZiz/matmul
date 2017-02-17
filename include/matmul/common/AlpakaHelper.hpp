@@ -205,10 +205,15 @@ struct MathVec
         T,
         T_Dim
     >;
+    using Vec2 = alpaka::vec::Vec<alpaka::dim::DimInt<2u>, TSize>;
+    using ViewType = Matrix<
+        alpakaHelper2::ConstPtrValue<T>,
+        Vec2
+    >;
     static constexpr auto dim = T_Dim::value;
 
     // data storage
-    /*__declspec(align(64))*/ T m_ptr[ dim ][ dim ];
+    __declspec(align(64)) T m_ptr[ dim ][ dim ];
 
     ALPAKA_FN_ACC
     MathVec( )
@@ -224,7 +229,7 @@ struct MathVec
     ) const
     -> T const &
     {
-        return m_ptr[ idx[0] ][ idx[1] ];;
+        return m_ptr[ idx[0] ][ idx[1] ];
     }
 
     template<
@@ -238,6 +243,19 @@ struct MathVec
     -> T &
     {
         return m_ptr[ idx[0] ][ idx[1] ];
+    }
+
+    ALPAKA_FN_HOST_ACC
+    auto
+    view(
+        Vec2 const & offset
+    )
+    -> ViewType
+    {
+        return ViewType(
+            static_cast<typename ViewType::ValuePtr>(&(*this)[offset]),
+            Vec2(dim,dim)
+        );
     }
 };
 
