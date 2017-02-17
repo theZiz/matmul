@@ -386,7 +386,7 @@
                         MatA const & MATMUL_RESTRICT matA,
                         MatB const & MATMUL_RESTRICT matB,
                         TElem const & beta,
-                        MatC MATMUL_RESTRICT matC)
+                        MatC matC)
                     -> size::Size<TAcc>
                     {
                         static_assert(

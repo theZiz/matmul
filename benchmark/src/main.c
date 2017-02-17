@@ -285,7 +285,11 @@ double measureRandomMatMul(
         printf("\t%12.8lf", timeMeasuredSec);
 #else
         // Print the GFLOPS.
-        double const operationCount = 2.0*pow((double)n, algo->exponentOmega);
+        #ifndef MATMUL_BENCHMARK_PRINT_GFLOPS_CORRECTED
+            double const operationCount = 2.0*pow((double)n, algo->exponentOmega);
+        #else
+            double const operationCount = (2.0*(double)n+3)*(double)n*(double)n;
+        #endif
         double const flops = (timeMeasuredSec!=0) ? (operationCount/timeMeasuredSec) : 0.0;
         printf("\t%12.8lf", flops*1.0e-9);
 #endif
