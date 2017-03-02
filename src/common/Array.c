@@ -47,7 +47,7 @@ void matmul_arr_fill_val(
     TElem const val)
 {
     assert(pArray);
-
+    #pragma omp for schedule(static)
     for(TSize i = 0; i<elemCount; ++i)
     {
         pArray[i] = val;
@@ -73,7 +73,7 @@ void matmul_arr_fill_idx(
     TSize const elemCount)
 {
     assert(pArray);
-
+    #pragma omp for schedule(static)
     for(TSize i = 0; i<elemCount; ++i)
     {
         pArray[i] = (TElem)i;
@@ -89,7 +89,7 @@ void matmul_arr_fill_rand(
     TElem const max)
 {
     assert(pArray);
-
+    #pragma omp for schedule(static)
     for(TSize i = 0; i<elemCount; ++i)
     {
         pArray[i] = matmul_gen_rand_val(min, max);
