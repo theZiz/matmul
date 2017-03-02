@@ -217,7 +217,7 @@
             //Shared alpakaHelperory used to store the current blocks of A and B.
             TElem * const sharedBasePointer(alpaka::block::shared::dyn::getMem<TElem>(acc));
             TElem * const sharedBasePointerB(sharedBasePointer + workSize[0] * workSize[1]);
-#ifdef REAL_SHARED_MEMORY
+#if REAL_SHARED_MEMORY == 1
             Matrix sharedMatA(
                 sharedBasePointer,
                 workSize
@@ -280,7 +280,7 @@
                     offsetA_x,
                     offsetInB_x
                 );
-#ifdef REAL_SHARED_MEMORY
+#if REAL_SHARED_MEMORY == 1
                 //load shared A & B
                 VECTOR_PRAGMA
                 for( TSize i(0); i < numWorkElemsPerDim; ++i )
@@ -438,7 +438,7 @@
                         boost::ignore_unused(matC);
 
                         // Reserve the buffer for the two blocks of A and B.
-#ifdef REAL_SHARED_MEMORY
+#if REAL_SHARED_MEMORY == 1
                         return 2u * blockThreadExtent.prod() * threadElemExtent.prod() * sizeof(TElem);
 #else
                         return 0;
