@@ -51,7 +51,7 @@
         >
     >
     {
-        using type = alpaka::dim::DimInt<2u>;
+        using type = alpaka::dim::DimInt<GPU_ELEM_NUM>;
     };
 #endif
 
@@ -151,8 +151,10 @@
                 {
                     auto const a = matA[Vec2(i,k)];
                     auto lineB = &(matB[Vec2(k,0)]);
+#ifndef ALPAKA_ACC_GPU_CUDA_ENABLED
                     __assume_aligned(lineC,64);// <- notwendig?
                     __assume_aligned(lineB,64);
+#endif
                     VECTOR_PRAGMA
                     for( TSize j(0); j < numElements; ++j )
                     {
@@ -713,7 +715,7 @@
         alpaka::mem::view::copy(stream, bufCAcc, bufCHost, v2uiExtentsC);
 
         // Let alpaka calculate good block and grid sizes given our full problem extents.
-        alpaka::workdiv::WorkDivMembers<Dim2, TSize> const workDiv(
+        alpaka::workdiv::WorkDivMembers<Dim2, TSize> workDiv(
             alpaka::workdiv::getValidWorkDiv<TAcc>(
                 devAcc,
                 v2uiExtentsC,

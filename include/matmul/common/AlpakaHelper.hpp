@@ -27,6 +27,12 @@
 // included classes can not be placed in alpakaHelper2
 //
 // \todo: please evaluate ifthis is only a bug in cuda 7.0
+
+
+#ifndef GPU_ELEM_NUM
+    #define GPU_ELEM_NUM 2u
+#endif
+
 namespace alpakaHelper2
 {
 
@@ -213,7 +219,10 @@ struct MathVec
     static constexpr auto dim = T_Dim::value;
 
     // data storage
-    __declspec(align(64)) T m_ptr[ dim ][ dim ];
+#ifndef ALPAKA_ACC_GPU_CUDA_ENABLED
+    __declspec(align(64))
+#endif
+    T m_ptr[ dim ][ dim ];
 
     ALPAKA_FN_ACC
     MathVec( )
@@ -254,7 +263,11 @@ struct MathVec
     {
         return ViewType(
             static_cast<typename ViewType::ValuePtr>(&(*this)[offset]),
+#ifndef ALPAKA_ACC_GPU_CUDA_ENABLED
             Vec2(dim,dim)
+#else
+            Vec2(TSize(GPU_ELEM_NUM),TSize(GPU_ELEM_NUM))
+#endif
         );
     }
 };
