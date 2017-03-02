@@ -540,6 +540,11 @@
         );
 
         // Let alpaka calculate good block and grid sizes given our full problem extents.
+#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
+        const alpaka::vec::Vec<Dim2, TSize> threads (TSize(16), TSize(16));
+        const alpaka::vec::Vec<Dim2, TSize> blocks  (m/threads[0]/elemExtent[0], n/threads[1]/elemExtent[1]);
+        alpaka::workdiv::WorkDivMembers<Dim2, TSize> workDiv(blocks,threads,elemExtent);
+#else
         alpaka::workdiv::WorkDivMembers<Dim2, TSize> workDiv(
             alpaka::workdiv::getValidWorkDiv<TAcc>(
                 devAcc,
@@ -547,10 +552,14 @@
                 elemExtent,
                 false,
                 alpaka::workdiv::GridBlockExtentSubDivRestrictions::EqualExtent));
+#endif
 
 #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
+        //cudaDeviceSetCacheConfig( cudaFuncCachePreferL1 );
+        cudaDeviceProp prop;
+        cudaGetDeviceProperties(&prop, 0);
         // We need to check, whether this workdiv is too big for the shared memory
-        while ( 2u * workDiv.m_blockThreadExtent.prod() * workDiv.m_threadElemExtent.prod() * sizeof(TElem) >= 65536) // 64KB
+        while ( 2u * workDiv.m_blockThreadExtent.prod() * workDiv.m_threadElemExtent.prod() * sizeof(TElem) > prop.sharedMemPerBlock) // 64KB or 112KB
         {
             workDiv.m_gridBlockExtent[0] *= 2;
             workDiv.m_gridBlockExtent[1] *= 2;
@@ -558,6 +567,13 @@
             workDiv.m_blockThreadExtent[1] /= 2;
         }
 #endif
+        size_t used_shared_memory = 2u * workDiv.m_blockThreadExtent.prod() * workDiv.m_threadElemExtent.prod() * sizeof(TElem);
+        std::cout << std::endl << "Workdiv: "
+                  << workDiv.m_gridBlockExtent[0] << "*" << workDiv.m_gridBlockExtent[1] << " : "
+                  << workDiv.m_blockThreadExtent[0] << "*" << workDiv.m_blockThreadExtent[1] << " : "
+                  << workDiv.m_threadElemExtent[0] << "*" << workDiv.m_threadElemExtent[1]
+                  << " (Shared Memory: " << used_shared_memory << " of "
+                  << prop.sharedMemPerBlock << ")" << std::endl;
 
         // Create an instance of the kernel functor.
         TKernelFnObj kernel;
