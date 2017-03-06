@@ -124,9 +124,6 @@
     >
     struct ElementMatMul
     {
-        ElementMatMul()
-        {}
-
         template<
             typename MatA,
             typename MatB,
@@ -151,9 +148,13 @@
                 {
                     auto const a = matA[Vec2(i,k)];
                     auto lineB = &(matB[Vec2(k,0)]);
-#ifndef ALPAKA_ACC_GPU_CUDA_ENABLED
+#ifdef __INTEL_COMPILER
                     __assume_aligned(lineC,64);// <- notwendig?
                     __assume_aligned(lineB,64);
+#endif
+#if __GNUG__!=0 && __NVCC__==0
+                    lineC = (decltype(lineC))__builtin_assume_aligned(lineC,64);// <- notwendig?
+                    lineB = (decltype(lineB))__builtin_assume_aligned(lineB,64);
 #endif
                     VECTOR_PRAGMA
                     for( TSize j(0); j < numElements; ++j )
@@ -572,9 +573,12 @@
                   << workDiv.m_gridBlockExtent[0] << "*" << workDiv.m_gridBlockExtent[1] << " : "
                   << workDiv.m_blockThreadExtent[0] << "*" << workDiv.m_blockThreadExtent[1] << " : "
                   << workDiv.m_threadElemExtent[0] << "*" << workDiv.m_threadElemExtent[1]
+#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
                   << " (Shared Memory: " << used_shared_memory << " of "
                   << prop.sharedMemPerBlock << ")" << std::endl;
-
+#else
+                  << std::endl;
+#endif
         // Create an instance of the kernel functor.
         TKernelFnObj kernel;
 
@@ -715,22 +719,33 @@
         // TODO: Test if interleaved is better then alloc first, copy later.
         // Because alloc causes a device sync this may hinder the copies.
         auto bufAAcc(alpaka::mem::buf::alloc<TElem, TSize>(devAcc, v2uiExtentsA));
+#ifndef ALPAKA_ACC_GPU_CUDA_ENABLED
         #pragma omp for schedule(guided)
         for (size_t i = 0; i < v2uiExtentsA.prod(); i++)
             alpaka::mem::view::getPtrNative(bufAAcc)[i] = 0;
+#endif
         alpaka::mem::view::copy(stream, bufAAcc, bufAHost, v2uiExtentsA);
         auto bufBAcc(alpaka::mem::buf::alloc<TElem, TSize>(devAcc, v2uiExtentsB));
+#ifndef ALPAKA_ACC_GPU_CUDA_ENABLED
         #pragma omp for schedule(guided)
         for (size_t i = 0; i < v2uiExtentsB.prod(); i++)
             alpaka::mem::view::getPtrNative(bufBAcc)[i] = 0;
+#endif
         alpaka::mem::view::copy(stream, bufBAcc, bufBHost, v2uiExtentsB);
         auto bufCAcc(alpaka::mem::buf::alloc<TElem, TSize>(devAcc, v2uiExtentsC));
+#ifndef ALPAKA_ACC_GPU_CUDA_ENABLED
         #pragma omp for schedule(guided)
         for (size_t i = 0; i < v2uiExtentsC.prod(); i++)
             alpaka::mem::view::getPtrNative(bufCAcc)[i] = 0;
+#endif
         alpaka::mem::view::copy(stream, bufCAcc, bufCHost, v2uiExtentsC);
 
         // Let alpaka calculate good block and grid sizes given our full problem extents.
+#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
+        const alpaka::vec::Vec<Dim2, TSize> threads (TSize(16), TSize(16));
+        const alpaka::vec::Vec<Dim2, TSize> blocks  (m/threads[0]/elemExtent[0], n/threads[1]/elemExtent[1]);
+        alpaka::workdiv::WorkDivMembers<Dim2, TSize> workDiv(blocks,threads,elemExtent);
+#else
         alpaka::workdiv::WorkDivMembers<Dim2, TSize> workDiv(
             alpaka::workdiv::getValidWorkDiv<TAcc>(
                 devAcc,
@@ -738,10 +753,14 @@
                 elemExtent,
                 false,
                 alpaka::workdiv::GridBlockExtentSubDivRestrictions::EqualExtent));
+#endif
 
 #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
+        //cudaDeviceSetCacheConfig( cudaFuncCachePreferL1 );
+        cudaDeviceProp prop;
+        cudaGetDeviceProperties(&prop, 0);
         // We need to check, whether this workdiv is too big for the shared memory
-        while ( 2u * workDiv.m_blockThreadExtent.prod() * workDiv.m_threadElemExtent.prod() * sizeof(TElem) >= 65536) // 64KB
+        while ( 2u * workDiv.m_blockThreadExtent.prod() * workDiv.m_threadElemExtent.prod() * sizeof(TElem) > prop.sharedMemPerBlock) // 64KB or 112KB
         {
             workDiv.m_gridBlockExtent[0] *= 2;
             workDiv.m_gridBlockExtent[1] *= 2;
@@ -749,7 +768,17 @@
             workDiv.m_blockThreadExtent[1] /= 2;
         }
 #endif
-
+        size_t used_shared_memory = 2u * workDiv.m_blockThreadExtent.prod() * workDiv.m_threadElemExtent.prod() * sizeof(TElem);
+        std::cout << std::endl << "Workdiv: "
+                  << workDiv.m_gridBlockExtent[0] << "*" << workDiv.m_gridBlockExtent[1] << " : "
+                  << workDiv.m_blockThreadExtent[0] << "*" << workDiv.m_blockThreadExtent[1] << " : "
+                  << workDiv.m_threadElemExtent[0] << "*" << workDiv.m_threadElemExtent[1]
+#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
+                  << " (Shared Memory: " << used_shared_memory << " of "
+                  << prop.sharedMemPerBlock << ")" << std::endl;
+#else
+                  << std::endl;
+#endif
         using Matrix = alpakaHelper::Matrix<
             alpakaHelper2::ConstPtrValue<TElem>,
             Vec2

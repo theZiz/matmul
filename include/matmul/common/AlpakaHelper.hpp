@@ -219,11 +219,14 @@ struct MathVec
     static constexpr auto dim = T_Dim::value;
 
     // data storage
-#ifndef ALPAKA_ACC_GPU_CUDA_ENABLED
+#ifdef __INTEL_COMPILER
     __declspec(align(64))
 #endif
-    T m_ptr[ dim ][ dim ];
-
+    T m_ptr[ dim ][ dim ]
+#ifdef __GNUG__
+    __attribute__ ((aligned (64)))
+#endif
+    ;
     ALPAKA_FN_ACC
     MathVec( )
     { }
