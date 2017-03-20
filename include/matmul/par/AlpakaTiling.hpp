@@ -151,8 +151,7 @@
 #ifdef __INTEL_COMPILER
                     __assume_aligned(lineC,64);// <- notwendig?
                     __assume_aligned(lineB,64);
-#endif
-#if __GNUG__!=0 && __NVCC__==0
+#elif __GNUG__!=0 && __NVCC__==0
                     lineC = (decltype(lineC))__builtin_assume_aligned(lineC,64);// <- notwendig?
                     lineB = (decltype(lineB))__builtin_assume_aligned(lineB,64);
 #endif
