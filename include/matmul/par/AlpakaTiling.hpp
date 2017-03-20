@@ -26,6 +26,7 @@
     #include "matmul/common/AlpakaHelper.hpp"
 
     #include <matmul/common/Mat.h>  // matmul_mat_gemm_early_out
+    #include <matmul/par/xl_c_version.h>
 
     #include <alpaka/alpaka.hpp>
 
@@ -139,31 +140,7 @@
         {
             using Vec2 = typename MatA::IndexType;
             constexpr auto numElements = T_Size::value;
-            VECTOR_PRAGMA
-            for( TSize i(0); i < numElements; ++i )
-            {
-                auto lineC = &(matC[Vec2(i,0)]);
-                VECTOR_PRAGMA
-                for( TSize k(0); k < numElements; ++k )
-                {
-                    auto const a = matA[Vec2(i,k)];
-                    auto lineB = &(matB[Vec2(k,0)]);
-#ifdef __INTEL_COMPILER
-                    __assume_aligned(lineC,64);// <- notwendig?
-                    __assume_aligned(lineB,64);
-#endif
-#if __GNUG__!=0 && __NVCC__==0
-                    lineC = (decltype(lineC))__builtin_assume_aligned(lineC,64);// <- notwendig?
-                    lineB = (decltype(lineB))__builtin_assume_aligned(lineB,64);
-#endif
-                    VECTOR_PRAGMA
-                    for( TSize j(0); j < numElements; ++j )
-                    {
-                            //matC[Vec2(i,j)] += a * matB[Vec2(k,j)];
-                            lineC[j] += a * lineB[j];
-                    }
-                }
-            }
+            xl_c_mul(&(matA[Vec2(TSize(0),TSize(0))]),&(matB[Vec2(TSize(0),TSize(0))]),&(matC[Vec2(TSize(0),TSize(0))]),matA.m_extent[0],matB.m_extent[0],matC.m_extent[0]);
         }
     };
 
