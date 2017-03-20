@@ -70,7 +70,8 @@
 #define VECTOR_PRAGMA \
     /*_Pragma ("vector aligned")*/ \
     /*_Pragma ("unroll (8)")*/ \
-    _Pragma ("ivdep")
+    _Pragma ("ivdep") \
+    _Pragma ("GCC ivdep")
 
 
 
@@ -142,12 +143,15 @@
             VECTOR_PRAGMA
             for( TSize i(0); i < numElements; ++i )
             {
-                auto lineC = &(matC[Vec2(i,0)]);
+                TElem* lineC = const_cast<TElem*>(&(matC[Vec2(i,0)]));
+                //auto lineC = &(matC[Vec2(i,0)]);
                 VECTOR_PRAGMA
                 for( TSize k(0); k < numElements; ++k )
                 {
-                    auto const a = matA[Vec2(i,k)];
-                    auto lineB = &(matB[Vec2(k,0)]);
+                    TElem const a = matA[Vec2(i,k)];
+                    //auto const a = matA[Vec2(i,k)];
+                    TElem* lineB = const_cast<TElem*>(&(matB[Vec2(k,0)]));
+                    //auto lineB = &(matB[Vec2(k,0)]);
 #ifdef __INTEL_COMPILER
                     __assume_aligned(lineC,64);// <- notwendig?
                     __assume_aligned(lineB,64);
@@ -260,6 +264,8 @@
 
             TSize const currentThreadInA_y( blockThreadIdx[ 0 ] * numWorkElemsPerDim);
             TSize const currentThreadInB_x( blockThreadIdx[ 1 ] * numWorkElemsPerDim);
+            TSize const currentThreadInA_y_2( blockThreadIdx[ 0 ]);
+            TSize const currentThreadInB_x_2( blockThreadIdx[ 1 ]);
             // needs architecture based mapping
             TSize const offsetInA_y(
                 gridBlockIdx[ 0 ] * workSize[ 0 ]
@@ -287,17 +293,17 @@
                 VECTOR_PRAGMA
                 for( TSize i(0); i < numWorkElemsPerDim; ++i )
                 {
-                    auto offsetInTile_X = currentThreadInA_y + i;
-                    auto lineSharedA = &(sharedMatA.m_ptr[offsetInTile_X * sharedMatA.m_extent[1]]);
-                    auto lineSharedB = &(sharedMatB.m_ptr[offsetInTile_X * sharedMatB.m_extent[1]]);
-                    auto lineMatA = &(matA.m_ptr[(offsetInTile_X + offsetInA_y) * matA.m_extent[1]]);
-                    auto lineMatB = &(matB.m_ptr[(offsetInTile_X + offsetA_x) * matB.m_extent[1]]);
+                    auto offsetInTile_Y = currentThreadInA_y_2 + i * numThreads[0];
+                    auto lineSharedA = &(sharedMatA.m_ptr[offsetInTile_Y * sharedMatA.m_extent[1]]);
+                    auto lineSharedB = &(sharedMatB.m_ptr[offsetInTile_Y * sharedMatB.m_extent[1]]);
+                    auto lineMatA = &(matA.m_ptr[(offsetInTile_Y + offsetInA_y) * matA.m_extent[1]]);
+                    auto lineMatB = &(matB.m_ptr[(offsetInTile_Y + offsetA_x) * matB.m_extent[1]]);
                     VECTOR_PRAGMA
                     for( TSize j(0); j < numWorkElemsPerDim; ++j )
                     {
                         Vec2 const offsetInTile(
-                            offsetInTile_X,
-                            currentThreadInB_x + j
+                            offsetInTile_Y,
+                            currentThreadInB_x_2 + j * numThreads[1]
                         );
                         Vec2 const globalIdxA(offsetInTile + globalBlockOffsetInA);
                         Vec2 const globalIdxB(offsetInTile + globalBlockOffsetInB);
