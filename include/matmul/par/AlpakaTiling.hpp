@@ -70,7 +70,8 @@
 #define VECTOR_PRAGMA \
     /*_Pragma ("vector aligned")*/ \
     /*_Pragma ("unroll (8)")*/ \
-    _Pragma ("ivdep")
+    _Pragma ("ivdep") \
+    _Pragma ("GCC ivdep")
 
 
 
@@ -142,17 +143,19 @@
             VECTOR_PRAGMA
             for( TSize i(0); i < numElements; ++i )
             {
-                auto lineC = &(matC[Vec2(i,0)]);
+                TElem* lineC = const_cast<TElem*>(&(matC[Vec2(i,0)]));
+                //auto lineC = &(matC[Vec2(i,0)]);
                 VECTOR_PRAGMA
                 for( TSize k(0); k < numElements; ++k )
                 {
-                    auto const a = matA[Vec2(i,k)];
-                    auto lineB = &(matB[Vec2(k,0)]);
+                    TElem const a = matA[Vec2(i,k)];
+                    //auto const a = matA[Vec2(i,k)];
+                    TElem* lineB = const_cast<TElem*>(&(matB[Vec2(k,0)]));
+                    //auto lineB = &(matB[Vec2(k,0)]);
 #ifdef __INTEL_COMPILER
                     __assume_aligned(lineC,64);// <- notwendig?
                     __assume_aligned(lineB,64);
-#endif
-#if __GNUG__!=0 && __NVCC__==0
+#elif __GNUG__!=0 && __NVCC__==0
                     lineC = (decltype(lineC))__builtin_assume_aligned(lineC,64);// <- notwendig?
                     lineB = (decltype(lineB))__builtin_assume_aligned(lineB,64);
 #endif
