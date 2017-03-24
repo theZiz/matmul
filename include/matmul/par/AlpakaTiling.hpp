@@ -264,8 +264,8 @@
 
             TSize const currentThreadInA_y( blockThreadIdx[ 0 ] * numWorkElemsPerDim);
             TSize const currentThreadInB_x( blockThreadIdx[ 1 ] * numWorkElemsPerDim);
-            TSize const currentThreadInA_y_2( blockThreadIdx[ 0 ]);
-            TSize const currentThreadInB_x_2( blockThreadIdx[ 1 ]);
+            //TSize const currentThreadInA_y_2( blockThreadIdx[ 0 ]);
+            //TSize const currentThreadInB_x_2( blockThreadIdx[ 1 ]);
             // needs architecture based mapping
             TSize const offsetInA_y(
                 gridBlockIdx[ 0 ] * workSize[ 0 ]
@@ -293,7 +293,8 @@
                 VECTOR_PRAGMA
                 for( TSize i(0); i < numWorkElemsPerDim; ++i )
                 {
-                    auto offsetInTile_Y = currentThreadInA_y_2 + i * numThreads[0];
+                    //auto offsetInTile_Y = currentThreadInA_y_2 + i * numThreads[0];
+                    auto offsetInTile_Y = currentThreadInA_y + i;
                     auto lineSharedA = &(sharedMatA.m_ptr[offsetInTile_Y * sharedMatA.m_extent[1]]);
                     auto lineSharedB = &(sharedMatB.m_ptr[offsetInTile_Y * sharedMatB.m_extent[1]]);
                     auto lineMatA = &(matA.m_ptr[(offsetInTile_Y + offsetInA_y) * matA.m_extent[1]]);
@@ -303,7 +304,8 @@
                     {
                         Vec2 const offsetInTile(
                             offsetInTile_Y,
-                            currentThreadInB_x_2 + j * numThreads[1]
+                            //currentThreadInB_x_2 + j * numThreads[1]
+                            currentThreadInB_x + j
                         );
                         Vec2 const globalIdxA(offsetInTile + globalBlockOffsetInA);
                         Vec2 const globalIdxB(offsetInTile + globalBlockOffsetInB);
