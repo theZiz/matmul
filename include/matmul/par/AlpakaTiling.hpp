@@ -336,13 +336,13 @@
                 {
                     using L1VecSize = alpaka::dim::DimInt<numWorkElemsPerDim/OMP_DIVISOR>;
                     VECTOR_PRAGMA
-                    for (int li = 0; li < OMP_DIVISOR; ++li)
+                    for (TSize li(0); li < OMP_DIVISOR; ++li)
                         VECTOR_PRAGMA
-                        for (int lj = 0; lj < OMP_DIVISOR; ++lj)
+                        for (TSize lj(0); lj < OMP_DIVISOR; ++lj)
                         {
                             Vec2 const globalIdx_Dot(
-                                li * L1VecSize::value,
-                                lj * L1VecSize::value
+                                li * TSize(L1VecSize::value),
+                                lj * TSize(L1VecSize::value)
                             );
                             Matrix tmpDot(
                                 matDot.view(globalIdx_Dot)
@@ -351,12 +351,12 @@
                             for (TSize k4(0); k4 < OMP_DIVISOR; ++k4 )
                             {
                                 Vec2 const globalIdx_A(
-                                    currentThreadInA_y + li * L1VecSize::value,
-                                    k3 + k4 * L1VecSize::value
+                                    currentThreadInA_y + li * TSize(L1VecSize::value),
+                                    k3 + k4 * TSize(L1VecSize::value)
                                 );
                                 Vec2 const globalIdx_B(
-                                    k3 + k4 * L1VecSize::value,
-                                    currentThreadInB_x + lj * L1VecSize::value
+                                    k3 + k4 * TSize(L1VecSize::value),
+                                    currentThreadInB_x + lj * TSize(L1VecSize::value)
                                 );
 
                                 decltype(sharedMatA) const tmpA(
