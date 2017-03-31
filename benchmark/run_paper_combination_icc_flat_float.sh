@@ -3,8 +3,9 @@ function doit {
 	rm -rf paper_combination_knl_icc_flat_float_$2_$1
 	mkdir paper_combination_knl_icc_flat_float_$2_$1
 	cd paper_combination_knl_icc_flat_float_$2_$1
-	../make_paper_autotuning_knl_flat_float.sh $2
-	OMP_NUM_THREADS=$1 numactl -C 0-$(expr $1 - 1) ./matmul_benchmark 10240 10240 1 5 > log.txt
+	../make_paper_autotuning_knl_float.sh $2
+	OMP_NUM_THREADS=$1 numactl -C 0-$(expr $1 - 1) -m 1 ./matmul_benchmark 7168 7168 1 10 > log7168.txt
+	OMP_NUM_THREADS=$1 numactl -C 0-$(expr $1 - 1) -m 1 ./matmul_benchmark 10240 10240 1 10 > log10240.txt
 	cd ..
 }
 
