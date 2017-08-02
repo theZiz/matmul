@@ -87,6 +87,33 @@
                     C, ldc);
         }
     #endif
+    #ifdef MATMUL_BUILD_PAR_ALPAKA_ACC_CPU_B_TBB_T_SEQ
+        //-----------------------------------------------------------------------------
+        //
+        //-----------------------------------------------------------------------------
+        TReturn matmul_gemm_par_alpaka_cpu_b_tbb_t_seq_tiling(
+            TSize const m, TSize const n, TSize const k,
+            TElem const alpha,
+            TElem const * const MATMUL_RESTRICT A, TSize const lda,
+            TElem const * const MATMUL_RESTRICT B, TSize const ldb,
+            TElem const beta,
+            TElem * const MATMUL_RESTRICT C, TSize const ldc)
+        {
+            if(matmul_mat_gemm_early_out(m, n, k, alpha, beta))
+            {
+                MATMUL_TIME_RETURN_EARLY_OUT;
+            }
+
+            return
+                matmul_gemm_par_alpaka_tiling<alpaka::acc::AccCpuTbbBlocks<alpaka::dim::DimInt<2u>, TSize>, GemmAlpakaTiling>(
+                    m, n, k,
+                    alpha,
+                    A, lda,
+                    B, ldb,
+                    beta,
+                    C, ldc);
+        }
+    #endif
     #ifdef MATMUL_BUILD_PAR_ALPAKA_ACC_CPU_B_SEQ_T_OMP2
         //-----------------------------------------------------------------------------
         //

@@ -642,6 +642,17 @@ int main(
             {matmul_gemm_par_alpaka_cpu_b_omp2_t_seq_tiling, "gemm_par_alpaka_cpu_b_omp2_t_seq_tiling", 3.0},
         #endif
     #endif
+    #ifdef MATMUL_BENCHMARK_PAR_ALPAKA_ACC_CPU_B_TBB_T_SEQ
+        #ifdef MATMUL_BENCHMARK_ALPAKA_CUDASDK_KERNEL
+            {matmul_gemm_par_alpaka_cpu_b_tbb_t_seq, "gemm_par_alpaka_cpu_b_tbb_t_seq", 3.0},
+        #endif
+        #ifdef MATMUL_BENCHMARK_ALPAKA_OMPNATIVE_KERNEL
+            {matmul_gemm_par_alpaka_cpu_b_tbb_t_seq_ompNative, "gemm_par_alpaka_cpu_b_tbb_t_seq_ompNative", 3.0},
+        #endif
+        #ifdef MATMUL_BENCHMARK_ALPAKA_TILING_KERNEL
+            {matmul_gemm_par_alpaka_cpu_b_tbb_t_seq_tiling, "gemm_par_alpaka_cpu_b_tbb_t_seq_tiling", 3.0},
+        #endif
+    #endif
     #ifdef MATMUL_BENCHMARK_PAR_ALPAKA_ACC_CPU_B_SEQ_T_OMP2
         #ifdef MATMUL_BENCHMARK_ALPAKA_CUDASDK_KERNEL
             {matmul_gemm_par_alpaka_cpu_b_seq_t_omp2, "gemm_par_alpaka_cpu_b_seq_t_omp2", 3.0},

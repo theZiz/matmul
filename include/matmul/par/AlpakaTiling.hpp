@@ -103,6 +103,21 @@
     };
 #endif
 
+
+#ifdef  ALPAKA_ACC_CPU_B_TBB_T_SEQ_ENABLED
+    template<
+        typename... T_Args
+    >
+    struct OptimalVectorSize<
+        alpaka::acc::AccCpuTbbBlocks<
+            T_Args...
+        >
+    >
+    {
+        using type = alpaka::dim::DimInt<OMP_ELEM_NUM>;
+    };
+#endif
+
 #ifdef ALPAKA_ACC_CPU_BT_OMP4_ENABLED
     template<
         typename... T_Args
